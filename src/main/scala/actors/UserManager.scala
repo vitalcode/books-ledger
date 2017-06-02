@@ -1,0 +1,56 @@
+package actors
+
+import akka.actor.{ActorLogging, ActorRef, Props}
+import akka.event.LoggingReceive
+import com.rbmhtechnology.eventuate.EventsourcedView
+import utils.exceptions.UserPresentException
+
+import scala.collection.mutable
+
+object UserManager{
+
+  //Command
+  case class RetrieveUser(email: String)
+
+  val ID = "um_id_dd782f9d"
+  val NAME = "user_manager"
+}
+
+class UserManager(override val id: String,
+                  override val aggregateId: Option[String],
+                  override val eventLog: ActorRef) extends EventsourcedView with ActorLogging{
+
+  import UserActor._
+  import UserManager._
+
+  private val usersInSystem = mutable.Map[String, String]() //email -> UUID
+
+  override def onCommand: Receive = LoggingReceive {
+
+    case CreateUser(user) =>
+      if(usersInSystem.contains(user.email))
+        sender() ! UserCreationFailed(UserPresentException)
+      else
+      getUserActor(user.id.toString) forward CreateUser(user)
+
+    case RetrieveUser(email: String) =>
+      usersInSystem.get(email) match {
+        case Some(userId) => getUserActor(userId.toString) forward GetUser
+        case None => sender() ! UserRetrievalFailure
+      }
+
+  }
+
+  override def onEvent: Receive = {
+    case UserCreated(user) => usersInSystem(user.email) = user.id
+  }
+
+  private def getUserActor(userId: String) : ActorRef =  {
+    val name = s"user_$userId"
+    context.child(name) match {
+      case Some(actorRef) => actorRef
+      case None => context.actorOf(Props(new UserActor(userId, Some(userId), eventLog, Some(id))), name)
+    }
+  }
+
+}
