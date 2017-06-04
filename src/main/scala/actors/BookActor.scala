@@ -52,9 +52,9 @@ case class BookActor(id: String,
 
   override def onEvent: Receive = {
     case Credited(creditAmount, _) =>
-      amount = amount - creditAmount
+      amount = amount + creditAmount
 
-    case Debited(debitAmount, _) => amount = amount + debitAmount
+    case Debited(debitAmount, _) => amount = amount - debitAmount
   }
 
   private def persistEvent(event: Event) = {

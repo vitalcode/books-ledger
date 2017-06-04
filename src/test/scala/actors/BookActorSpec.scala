@@ -3,7 +3,7 @@ package actors
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-import actors.BookActor.{BookOperationFailure, BookOperationSuccess, Credit}
+import actors.BookActor.{BookOperationFailure, BookOperationSuccess, Credit, Debit}
 import actors.helpers.DefaultTimeout
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
@@ -26,14 +26,23 @@ class BookActorSpec(_system: ActorSystem) extends TestKit(_system) with Implicit
   "A book actor" must {
 
     "be able to credit book amount when called with `Credit` command" in {
-      //Arrange
       val bookName = UUID.randomUUID().toString
       val bookActor = system.actorOf(Props(BookActor(bookName, eventLog, 10)))
 
-      //Act
       bookActor ! Credit(2, "Some credit")
 
-      //Assert
+      expectMsgPF(timeout) {
+        case BookOperationSuccess(amount) => amount mustBe 12
+        case BookOperationFailure(_) => fail
+      }
+    }
+
+    "be able to debit book amount when called with `Debit` command" in {
+      val bookName = UUID.randomUUID().toString
+      val bookActor = system.actorOf(Props(BookActor(bookName, eventLog, 10)))
+
+      bookActor ! Debit(2, "Some debit")
+
       expectMsgPF(timeout) {
         case BookOperationSuccess(amount) => amount mustBe 8
         case BookOperationFailure(_) => fail
