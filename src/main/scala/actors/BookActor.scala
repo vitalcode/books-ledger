@@ -11,9 +11,9 @@ import scala.util.{Failure, Success}
 object BookActor {
 
   //Commands
-  case class Credit(amount: BigDecimal, note: String)
+  case class BookCredit(amount: BigDecimal, note: String)
 
-  case class Debit(amount: BigDecimal, note: String)
+  case class BookDebit(amount: BigDecimal, note: String)
 
   //Replies
   case class BookOperationSuccess(amount: BigDecimal)
@@ -23,9 +23,9 @@ object BookActor {
   //Events
   trait Event
 
-  case class Credited(amount: BigDecimal, note: String) extends Event
+  case class BookCredited(amount: BigDecimal, note: String) extends Event
 
-  case class Debited(amount: BigDecimal, note: String) extends Event
+  case class BookDebited(amount: BigDecimal, note: String) extends Event
 
   def apply(bookName: String,
             eventLog: ActorRef,
@@ -45,16 +45,16 @@ case class BookActor(id: String,
   override val aggregateId: Option[String] = Some(bookName)
 
   override def onCommand: Receive = {
-    case Credit(creditAmount, note) =>
-      persistEvent(Credited(creditAmount, note))
-    case Debit(debitAmount, note) => persistEvent(Debited(debitAmount, note))
+    case BookCredit(creditAmount, note) =>
+      persistEvent(BookCredited(creditAmount, note))
+    case BookDebit(debitAmount, note) => persistEvent(BookDebited(debitAmount, note))
   }
 
   override def onEvent: Receive = {
-    case Credited(creditAmount, _) =>
+    case BookCredited(creditAmount, _) =>
       amount = amount + creditAmount
 
-    case Debited(debitAmount, _) => amount = amount - debitAmount
+    case BookDebited(debitAmount, _) => amount = amount - debitAmount
   }
 
   private def persistEvent(event: Event) = {

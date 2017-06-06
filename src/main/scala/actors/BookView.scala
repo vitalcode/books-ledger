@@ -2,10 +2,12 @@ package actors
 
 import java.util.UUID
 
-import actors.BookActor.{Credited, Debited}
+import actors.BookActor.{BookCredited, BookDebited}
 import actors.BookView.{BookBalance, BookRecords, GetBookBalance, GetBookRecords}
 import akka.actor.{ActorLogging, ActorRef}
 import com.rbmhtechnology.eventuate.EventsourcedView
+
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 object BookView {
 
@@ -22,7 +24,7 @@ object BookView {
   def apply(owner: String,
             bookName: String,
             eventLog: ActorRef): BookView  = BookView(
-    id = "A",//UUID.randomUUID().toString,
+    id = UUID.randomUUID().toString,
     owner = owner,
     bookName = bookName,
     eventLog = eventLog
@@ -34,29 +36,27 @@ case class BookView(id: String,
                     bookName: String,
                     eventLog: ActorRef) extends EventsourcedView with ActorLogging {
 
-//  override val aggregateId: Option[String] = Some(s"$owner-$bookName")
-  override val aggregateId: Option[String] = Some(bookName)
+  override val aggregateId: Option[String] = Some(s"$owner-$bookName")
 
   private var balance: BigDecimal = 0
-  private var records: Seq[BigDecimal] = Seq()
+  private val records: ArrayBuffer[BigDecimal] = ArrayBuffer()
 
   override def onCommand: Receive = {
-    case GetBookBalance =>
-      sender() ! BookBalance(balance)
+    case GetBookBalance => sender() ! BookBalance(balance)
     case GetBookRecords => sender() ! BookRecords(records)
   }
 
   override def onEvent: Receive = {
-    case Credited(creditAmount, _) =>
-      appendRecord(creditAmount)
-      balance = balance + creditAmount
-    case Debited(debitAmount, _) =>
+    case BookDebited(debitAmount, _) =>
       appendRecord(debitAmount)
-      balance = balance - debitAmount
+      balance = balance + debitAmount
+    case BookCredited(creditAmount, _) =>
+      appendRecord(creditAmount)
+      balance = balance - creditAmount
   }
 
   private def appendRecord(record: BigDecimal) = {
-    records :+ record
+    records += record
   }
 }
 

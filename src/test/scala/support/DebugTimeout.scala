@@ -1,4 +1,4 @@
-package actors.helpers
+package helpers
 
 import java.util.concurrent.TimeUnit
 

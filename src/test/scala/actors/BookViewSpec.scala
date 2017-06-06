@@ -1,37 +1,45 @@
 package actors
 
-import actors.BookActor.{Credited, Debited}
+import actors.BookActor.BookDebited
 import actors.BookView._
-import actors.helpers.DebugTimeout
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.rbmhtechnology.eventuate.EventsourcingProtocol.{LoadSnapshot, LoadSnapshotSuccess, Replay, ReplaySuccess}
-import com.rbmhtechnology.eventuate.{DurableEvent, VectorTime}
-import org.scalatest.{MustMatchers, WordSpecLike}
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestKit}
+import helpers.DebugTimeout
+import org.scalatest.{Matchers, WordSpecLike}
+import support.EventLogContext
 
-class BookViewSpec(_system: ActorSystem) extends TestKit(_system) with DebugTimeout with ImplicitSender
-  with WordSpecLike with MustMatchers {
+class BookViewSpec(_system: ActorSystem) extends TestKit(_system)
+  with ImplicitSender with EventLogContext with DebugTimeout
+  with WordSpecLike with Matchers {
 
-  def this() = this(ActorSystem("BookViewSpec5"))
+  def this() = this(ActorSystem("BookViewSpec"))
 
-  "A book view" must {
+  val owner = "TestUser"
+  val aggregateId = "Book"
 
+  "A book view" should {
 
-    "be increase balance by listening on BookActor's `Credited` event" in new Context {
-      withLog { log =>
+    "increase balance and add book records when BookActor's `BookDebited` event is emitted" in {
+      withEventLog { (eventLog, emitterId) =>
 
-        val bookView = system.actorOf(Props(BookView(owner, emitterIdA, log)))
+        val bookView = system.actorOf(Props(new BookView(emitterId, owner, aggregateId, eventLog)))
 
-        addEventToLog(bookView,
-          Credited(1, "note"),
-          Credited(4, "note"),
-          Debited(2, "note")
+        addEventToLog(bookView, owner, aggregateId,
+          BookDebited(6, "note"),
+          BookDebited(6, "note")
         )
 
         bookView ! GetBookBalance
 
         expectMsgPF(timeout) {
-          case BookBalance(amount) => amount mustBe 3
+          case BookBalance(amount) => amount shouldBe 12
+          case _ => fail
+        }
+
+        bookView ! GetBookRecords
+
+        expectMsgPF(timeout) {
+          case BookRecords(records) => records shouldBe Seq(6, 6)
           case _ => fail
         }
       }
@@ -50,42 +58,6 @@ class BookViewSpec(_system: ActorSystem) extends TestKit(_system) with DebugTime
       //        case _ => fail
       //      }
       //    }
-    }
-
-    trait Context {
-
-      val owner = "testUser"
-      val emitterIdA = "A"
-
-      val logIdA = "logA"
-      val logIdB = "logB"
-
-      val instanceId = 0
-
-      val logProbe = TestProbe()
-
-      def timestamp(a: Long = 0L, b: Long = 0L) = (a, b) match {
-        case (0L, 0L) => VectorTime()
-        case (a, 0L) => VectorTime(logIdA -> a)
-        case (0L, b) => VectorTime(logIdB -> b)
-        case (a, b) => VectorTime(logIdA -> a, logIdB -> b)
-      }
-
-      def withLog(test: ActorRef => Unit) = {
-        test(logProbe.ref)
-      }
-
-      def addEventToLog(actor: ActorRef, events: Any*) = {
-        logProbe.expectMsg(LoadSnapshot(emitterIdA, 0))
-        logProbe.sender() ! LoadSnapshotSuccess(None, instanceId)
-
-        logProbe.expectMsg(Replay(1, Some(actor), Some(emitterIdA), 0))
-        val durableEvents = events.map(DurableEvent(_, emitterIdA, Option(emitterIdA), Set(), 0L, timestamp(1, 0), logIdA, logIdA, instanceId)).toList
-        logProbe.sender() ! ReplaySuccess(durableEvents, durableEvents.size, instanceId)
-
-        logProbe.expectMsg(Replay(durableEvents.size + 1, None, Some(emitterIdA), instanceId))
-        logProbe.sender() ! ReplaySuccess(Nil, 0, instanceId)
-      }
     }
   }
 }
