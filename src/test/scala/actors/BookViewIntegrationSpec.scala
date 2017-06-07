@@ -22,35 +22,69 @@ class BookViewIntegrationSpec(_system: ActorSystem) extends TestKit(_system)
   val eventLog = endpoint.logs(DefaultLogName)
 
   val owner = "TestUser"
-  val aggregateId = id
 
-  "BookView should collaborate with BookActor and" - {
+  "BookView should collaborate with BookActor by" - {
 
-    "increase balance when BookActor receives `BookDebit` command" in {
+    "recording records and" - {
 
-      val bookView = system.actorOf(Props(new BookView(id, owner, aggregateId, eventLog)))
-      val bookActor = system.actorOf(Props(new BookActor(id, owner, aggregateId, eventLog)))
+      "increasing balance when BookActor receives `BookDebit` command" in {
+
+        val aggregateId = id
+
+        val bookView = system.actorOf(Props(new BookView(id, owner, aggregateId, eventLog)))
+        val bookActor = system.actorOf(Props(new BookActor(id, owner, aggregateId, eventLog)))
 
 
-      bookActor ! BookDebit(2, "note")
+        bookActor ! BookDebit(2, "note")
 
-      expectMsgPF(timeout) {
-        case BookOperationSuccess(amount) => amount shouldBe 2
-        case BookOperationFailure(_) => fail
+        expectMsgPF(timeout) {
+          case BookOperationSuccess(amount) => amount shouldBe 2
+          case BookOperationFailure(_) => fail
+        }
+
+        bookView ! GetBookBalance
+
+        expectMsgPF(timeout) {
+          case BookBalance(amount) => amount shouldBe 2
+          case _ => fail
+        }
+
+        bookView ! GetBookRecords
+
+        expectMsgPF(timeout) {
+          case BookRecords(records) => records shouldBe Seq(2)
+          case _ => fail
+        }
       }
 
-      bookView ! GetBookBalance
+      "decreasing balance when BookActor receives `BookCredit` command" in {
 
-      expectMsgPF(timeout) {
-        case BookBalance(amount) => amount shouldBe 2
-        case _ => fail
-      }
+        val aggregateId = id
 
-      bookView ! GetBookRecords
+        val bookView = system.actorOf(Props(new BookView(id, owner, aggregateId, eventLog)))
+        val bookActor = system.actorOf(Props(new BookActor(id, owner, aggregateId, eventLog)))
 
-      expectMsgPF(timeout) {
-        case BookRecords(records) => records shouldBe Seq(2)
-        case _ => fail
+
+        bookActor ! BookCredit(2, "note")
+
+        expectMsgPF(timeout) {
+          case BookOperationSuccess(amount) => amount shouldBe -2
+          case BookOperationFailure(_) => fail
+        }
+
+        bookView ! GetBookBalance
+
+        expectMsgPF(timeout) {
+          case BookBalance(amount) => amount shouldBe -2
+          case _ => fail
+        }
+
+        bookView ! GetBookRecords
+
+        expectMsgPF(timeout) {
+          case BookRecords(records) => records shouldBe Seq(2)
+          case _ => fail
+        }
       }
     }
   }
