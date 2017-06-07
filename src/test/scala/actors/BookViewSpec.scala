@@ -25,8 +25,8 @@ class BookViewSpec(_system: ActorSystem) extends TestKit(_system)
           val bookView = system.actorOf(Props(new BookView(emitterId, owner, aggregateId, eventLog)))
 
           addEventToLog(bookView, owner, aggregateId,
-            BookDebited(6, "note"),
-            BookDebited(6, "note")
+            BookDebited(6, "", "note"),
+            BookDebited(6, "", "note")
           )
 
           bookView ! GetBookBalance
@@ -50,9 +50,9 @@ class BookViewSpec(_system: ActorSystem) extends TestKit(_system)
           val bookView = system.actorOf(Props(new BookView(emitterId, owner, aggregateId, eventLog)))
 
           addEventToLog(bookView, owner, aggregateId,
-            BookDebited(6, "note"),
-            BookDebited(6, "note"),
-            BookCredited(3, "note")
+            BookDebited(6, "", "note"),
+            BookDebited(6, "", "note"),
+            BookCredited(3, "", "note")
           )
 
           bookView ! GetBookBalance

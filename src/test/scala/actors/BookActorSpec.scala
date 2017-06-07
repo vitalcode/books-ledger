@@ -23,14 +23,14 @@ class BookActorSpec(_system: ActorSystem) extends TestKit(_system)
         val bookActor = system.actorOf(Props(new BookActor(emitterId, owner, aggregateId, eventLog)))
 
         addEventToLog(bookActor, owner, aggregateId,
-          BookDebited(6, "note"),
-          BookDebited(6, "note")
+          BookDebited(6, "", "note"),
+          BookDebited(6, "", "note")
         )
 
         bookActor ! BookDebit(3, "note")
         bookActor ! BookDebit(4, "note")
 
-        expectEvents(BookDebited(3, "note"), BookDebited(4, "note"))
+        expectEvents(BookDebited(3, "", "note"), BookDebited(4, "", "note"))
 
         expectMsg(BookOperationSuccess(15))
         expectMsg(BookOperationSuccess(19))
@@ -41,15 +41,15 @@ class BookActorSpec(_system: ActorSystem) extends TestKit(_system)
         val bookActor = system.actorOf(Props(new BookActor(emitterId, owner, aggregateId, eventLog)))
 
         addEventToLog(bookActor, owner, aggregateId,
-          BookDebited(6, "note"),
-          BookDebited(6, "note")
+          BookDebited(6, "", "note"),
+          BookDebited(6, "", "note")
         )
 
         bookActor ! BookCredit(3, "note")
         bookActor ! BookCredit(1, "note")
 
-        expectEvents(BookCredited(3, "note"))
-        expectEvents(BookCredited(1, "note"))
+        expectEvents(BookCredited(3, "", "note"))
+        expectEvents(BookCredited(1, "", "note"))
 
         expectMsg(BookOperationSuccess(9))
         expectMsg(BookOperationSuccess(8))

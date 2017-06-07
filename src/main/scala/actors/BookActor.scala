@@ -23,9 +23,9 @@ object BookActor {
   //Events
   trait Event
 
-  case class BookCredited(amount: BigDecimal, note: String) extends Event
+  case class BookCredited(amount: BigDecimal, book: String, note: String) extends Event
 
-  case class BookDebited(amount: BigDecimal, note: String) extends Event
+  case class BookDebited(amount: BigDecimal, book: String, note: String) extends Event
 }
 
 case class BookActor(id: String,
@@ -39,16 +39,16 @@ case class BookActor(id: String,
 
   override def onCommand: Receive = {
     case BookCredit(creditAmount, note) =>
-      persistEvent(BookCredited(creditAmount, note))
+      persistEvent(BookCredited(creditAmount, "", note))
     case BookDebit(debitAmount, note) =>
       //sender() ! BookOperationSuccess(balance)
-      persistEvent(BookDebited(debitAmount, note))
+      persistEvent(BookDebited(debitAmount, "", note))
   }
 
   override def onEvent: Receive = {
-    case BookCredited(creditAmount, _) =>
+    case BookCredited(creditAmount, _,  _) =>
       balance = balance - creditAmount
-    case BookDebited(debitAmount, _) =>
+    case BookDebited(debitAmount, _, _) =>
       println(debitAmount)
       balance = balance + debitAmount
   }
