@@ -5,10 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.TestProbe
-import com.rbmhtechnology.eventuate.EventsourcingProtocol.{LoadSnapshot, LoadSnapshotSuccess, Replay, ReplaySuccess}
+import com.rbmhtechnology.eventuate.EventsourcingProtocol._
 import com.rbmhtechnology.eventuate.{DurableEvent, VectorTime}
+import org.scalatest.Matchers
 
-trait EventLogContext {
+trait EventLogContext extends Matchers {
 
   val logIdA = "logA"
   var instanceId: Int = _
@@ -36,5 +37,26 @@ trait EventLogContext {
 
     logProbe.expectMsg(Replay(durableEvents.size + 1, None, userAggregateId, instanceId))
     logProbe.sender() ! ReplaySuccess(Nil, 0, instanceId)
+  }
+
+  def expectEvents(events: Any*)(implicit actor: ActorRef) = {
+
+    val emitterIdA = "A"
+    def event(payload: Any, sequenceNr: Long): DurableEvent = DurableEvent(payload, emitterIdA, None, Set(), 0L, VectorTime(logIdA -> sequenceNr), logIdA, logIdA, sequenceNr)
+
+    val write = logProbe.expectMsgClass(classOf[Write])
+    write.events.zipWithIndex.foreach{
+      case (event, index) =>
+        println (s"ass ${event.payload} -> ${events(index)}")
+        event.payload shouldBe events(index)
+    }
+
+    val e = events.zipWithIndex.map {
+      case (e, i) => event(e, i)
+    }.toList
+
+    logProbe.sender() ! WriteSuccess(e, write.correlationId, instanceId)
+//    logProbe.sender() ! WriteSuccess(events.map(event(_, 1L)).toList, write.correlationId, instanceId)
+
   }
 }

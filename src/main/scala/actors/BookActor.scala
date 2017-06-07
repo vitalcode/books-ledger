@@ -4,7 +4,7 @@ import java.util.UUID
 
 import actors.BookActor._
 import akka.actor.ActorRef
-import com.rbmhtechnology.eventuate.EventsourcedActor
+import com.rbmhtechnology.eventuate.{EventsourcedActor, EventsourcedView}
 
 import scala.util.{Failure, Success}
 
@@ -26,42 +26,39 @@ object BookActor {
   case class BookCredited(amount: BigDecimal, note: String) extends Event
 
   case class BookDebited(amount: BigDecimal, note: String) extends Event
-
-  def apply(bookName: String,
-            eventLog: ActorRef,
-            amount: BigDecimal) = new BookActor(
-    id = UUID.randomUUID().toString,
-    bookName = bookName,
-    eventLog = eventLog,
-    amount = amount
-  )
 }
 
 case class BookActor(id: String,
+                     owner: String,
                      bookName: String,
-                     eventLog: ActorRef,
-                     private var amount: BigDecimal) extends EventsourcedActor {
+                     eventLog: ActorRef) extends EventsourcedActor {
 
-  override val aggregateId: Option[String] = Some(bookName)
+  override val aggregateId: Option[String] = Some(s"$owner-$bookName")
+
+  private var balance: BigDecimal = 0
 
   override def onCommand: Receive = {
     case BookCredit(creditAmount, note) =>
       persistEvent(BookCredited(creditAmount, note))
-    case BookDebit(debitAmount, note) => persistEvent(BookDebited(debitAmount, note))
+    case BookDebit(debitAmount, note) =>
+      //sender() ! BookOperationSuccess(balance)
+      persistEvent(BookDebited(debitAmount, note))
   }
 
   override def onEvent: Receive = {
     case BookCredited(creditAmount, _) =>
-      amount = amount + creditAmount
-
-    case BookDebited(debitAmount, _) => amount = amount - debitAmount
+      balance = balance - creditAmount
+    case BookDebited(debitAmount, _) =>
+      println(debitAmount)
+      balance = balance + debitAmount
   }
 
   private def persistEvent(event: Event) = {
     persist(event) {
       case Success(_) =>
-        sender() ! BookOperationSuccess(amount)
-      case Failure(cause) => sender() ! BookOperationFailure(cause)
+        sender() ! BookOperationSuccess(balance)
+      case Failure(cause) =>
+        sender() ! BookOperationFailure(cause)
     }
   }
 }

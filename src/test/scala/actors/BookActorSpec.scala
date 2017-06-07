@@ -1,74 +1,59 @@
 package actors
 
-import java.util.UUID
-import java.util.concurrent.TimeUnit
-
-import actors.BookActor.{BookOperationFailure, BookOperationSuccess, BookCredit, BookDebit}
-import actors.BookView.{BookBalance, GetBookBalance}
-import helpers.{DebugTimeout, DefaultTimeout}
+import actors.BookActor._
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import com.rbmhtechnology.eventuate.ReplicationEndpoint
-import com.rbmhtechnology.eventuate.ReplicationEndpoint._
-import com.rbmhtechnology.eventuate.log.leveldb.LeveldbEventLog
-import org.scalatest.{MustMatchers, WordSpecLike}
+import helpers.DebugTimeout
+import org.scalatest.{FreeSpecLike, Matchers}
+import support.EventLogContext
 
-import scala.concurrent.duration.Duration
-
-
-class BookActorSpec(_system: ActorSystem) extends TestKit(_system) with ImplicitSender with DebugTimeout
-  with WordSpecLike with MustMatchers {
+class BookActorSpec(_system: ActorSystem) extends TestKit(_system)
+  with ImplicitSender with EventLogContext with DebugTimeout
+  with FreeSpecLike with Matchers {
 
   def this() = this(ActorSystem("BookActorSpec"))
 
-  val endpoint = ReplicationEndpoint(id => LeveldbEventLog.props(logId = "BookActorSpec"))(_system)
-  val eventLog = endpoint.logs(DefaultLogName)
+  val owner = "TestUser"
+  val aggregateId = "Book"
 
-  "A book actor" must {
+  "BookActor should" - {
+    "be able to increase book balance when called with `BookDebit` command" in {
+      withEventLog { (eventLog, emitterId) =>
 
-    "be able to credit book amount when called with `Credit` command" in {
-      val bookName = UUID.randomUUID().toString
-      val bookActor = system.actorOf(Props(BookActor(bookName, eventLog, 10)))
+        val bookActor = system.actorOf(Props(new BookActor(emitterId, owner, aggregateId, eventLog)))
 
-      bookActor ! BookCredit(2, "Some credit")
+        addEventToLog(bookActor, owner, aggregateId,
+          BookDebited(6, "note"),
+          BookDebited(6, "note")
+        )
 
-      expectMsgPF(timeout) {
-        case BookOperationSuccess(amount) => amount mustBe 12
-        case BookOperationFailure(_) => fail
+        bookActor ! BookDebit(3, "note")
+        bookActor ! BookDebit(4, "note")
+
+        expectEvents(BookDebited(3, "note"), BookDebited(4, "note"))
+
+        expectMsg(BookOperationSuccess(15))
+        expectMsg(BookOperationSuccess(19))
       }
     }
+    "be able to decrease book balance when called with `BookCredit` command" in {
+      withEventLog { (eventLog, emitterId) =>
+        val bookActor = system.actorOf(Props(new BookActor(emitterId, owner, aggregateId, eventLog)))
 
-    "be able to debit book amount when called with `Debit` command" in {
-      val bookName = UUID.randomUUID().toString
-      val bookActor = system.actorOf(Props(BookActor(bookName, eventLog, 10)))
+        addEventToLog(bookActor, owner, aggregateId,
+          BookDebited(6, "note"),
+          BookDebited(6, "note")
+        )
 
-      bookActor ! BookDebit(2, "Some debit")
+        bookActor ! BookCredit(3, "note")
+        bookActor ! BookCredit(1, "note")
 
-      expectMsgPF(timeout) {
-        case BookOperationSuccess(amount) => amount mustBe 8
-        case BookOperationFailure(_) => fail
+        expectEvents(BookCredited(3, "note"))
+        expectEvents(BookCredited(1, "note"))
+
+        expectMsg(BookOperationSuccess(9))
+        expectMsg(BookOperationSuccess(8))
       }
     }
-
-//    "be able to debit book amount from view when called with `Debit` command" in {
-//      val bookName = UUID.randomUUID().toString
-//      val owner = "testUser"
-//      val bookActor = system.actorOf(Props(BookActor(bookName, eventLog, 10)))
-//      val bookView = system.actorOf(Props(BookView(owner, bookName, eventLog)))
-//
-//      bookActor ! Debit(2, "Some debit")
-//
-//      expectMsgPF(timeout) {
-//        case BookOperationSuccess(amount) => amount mustBe 8
-//        case BookOperationFailure(_) => fail
-//      }
-//
-//      bookView ! GetBookBalance
-//
-//      expectMsgPF(timeout) {
-//        case BookBalance(amount) => amount mustBe -2
-//        case _ => fail
-//      }
-//    }
   }
 }

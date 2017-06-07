@@ -7,7 +7,7 @@ import actors.BookView.{BookBalance, BookRecords, GetBookBalance, GetBookRecords
 import akka.actor.{ActorLogging, ActorRef}
 import com.rbmhtechnology.eventuate.EventsourcedView
 
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ArrayBuffer
 
 object BookView {
 
